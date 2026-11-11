@@ -1,6 +1,6 @@
 # Northstar Market
 
-Chosen option: B — Marketplace Product-Listing Page
+Chosen option: B - Marketplace Product-Listing Page
 
 Northstar Market is a modern React + Tailwind storefront built for a curated lifestyle marketplace. It showcases a responsive catalogue, dynamic product detail pages, category filtering, and a cart system powered by React state management. The design is optimized for clarity, accessibility, and mobile-first browsing.
 

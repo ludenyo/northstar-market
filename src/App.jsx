@@ -2,6 +2,8 @@ import { BrowserRouter, Link, NavLink, Route, Routes, useParams } from 'react-ro
 import { useMemo, useReducer, useState } from 'react'
 import { products } from './data/products'
 
+const FORM_ENDPOINT = import.meta.env.VITE_FORM_ENDPOINT || 'https://formspree.io/f/xrgnzzky'
+
 const formatCurrency = new Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: 'USD',
@@ -120,6 +122,21 @@ function App() {
                 />
               }
             />
+            <Route
+              path="/cart"
+              element={
+                <CartPage
+                  cart={cart}
+                  onAddToCart={(product) =>
+                    dispatchCart({ type: 'add', product })
+                  }
+                  onRemove={(productId) =>
+                    dispatchCart({ type: 'remove', productId })
+                  }
+                  onClear={() => dispatchCart({ type: 'clear' })}
+                />
+              }
+            />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </main>
@@ -166,7 +183,7 @@ function Header({ itemCount }) {
         </nav>
 
         <Link
-          to="/products"
+          to="/cart"
           className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-soft hover:bg-slate-700"
           aria-label={`Shopping cart with ${itemCount} items`}
         >
@@ -518,16 +535,39 @@ function NewsletterForm() {
     setStatus('submitting')
     setMessage('Submitting your request...')
 
-    await new Promise((resolve) => setTimeout(resolve, 900))
+    try {
+      const response = await fetch(FORM_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          interest: formData.interest,
+          consent: formData.consent,
+        }),
+      })
 
-    setStatus('success')
-    setMessage('You are on the list. Expect a welcome note soon.')
-    setFormData({
-      name: '',
-      email: '',
-      interest: 'Home office',
-      consent: false,
-    })
+      if (!response.ok) {
+        throw new Error('Submission failed.')
+      }
+
+      setStatus('success')
+      setMessage('You are on the list. Expect a welcome note soon.')
+      setFormData({
+        name: '',
+        email: '',
+        interest: 'Home office',
+        consent: false,
+      })
+    } catch {
+      setStatus('error')
+      setMessage(
+        'We could not send your signup right now. Please check your Formspree endpoint or try again later.',
+      )
+    }
   }
 
   return (
@@ -616,6 +656,128 @@ function NewsletterForm() {
         )}
       </form>
     </div>
+  )
+}
+
+function CartPage({ cart, onAddToCart, onRemove, onClear }) {
+  const cartEntries = Object.values(cart)
+  const subtotal = cartEntries.reduce(
+    (total, item) => total + item.product.price * item.quantity,
+    0,
+  )
+
+  if (cartEntries.length === 0) {
+    return (
+      <section className="rounded-[2rem] bg-white p-10 text-center shadow-sm ring-1 ring-slate-200">
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-600">Cart</p>
+        <h1 className="mt-3 font-display text-4xl font-bold text-slate-900">Your cart is empty.</h1>
+        <p className="mt-3 text-slate-600">
+          Add a few favorites to your cart and they will appear here.
+        </p>
+        <Link
+          to="/products"
+          className="mt-6 inline-flex rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-700"
+        >
+          Continue shopping
+        </Link>
+      </section>
+    )
+  }
+
+  return (
+    <section className="space-y-6">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-600">Cart</p>
+          <h1 className="mt-2 font-display text-4xl font-bold text-slate-900">Your items</h1>
+        </div>
+        <button
+          type="button"
+          onClick={onClear}
+          className="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+        >
+          Clear cart
+        </button>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[1.4fr_0.6fr]">
+        <div className="space-y-4">
+          {cartEntries.map(({ product, quantity }) => (
+            <div
+              key={product.id}
+              className="flex flex-col gap-4 rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center"
+            >
+              <img
+                src={product.image}
+                alt={product.name}
+                width={120}
+                height={120}
+                className="h-28 w-full rounded-xl object-cover sm:w-28"
+              />
+
+              <div className="flex-1">
+                <Link to={`/products/${product.id}`} className="text-xl font-semibold text-slate-900 hover:text-brand-600">
+                  {product.name}
+                </Link>
+                <p className="mt-1 text-sm text-slate-600">{product.category}</p>
+                <p className="mt-2 text-lg font-bold text-slate-900">
+                  {formatCurrency.format(product.price)}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => onRemove(product.id)}
+                  className="h-9 w-9 rounded-full border border-slate-300 text-lg text-slate-700 hover:bg-slate-100"
+                  aria-label={`Remove one ${product.name}`}
+                >
+                  −
+                </button>
+                <span className="min-w-8 text-center text-sm font-semibold text-slate-800">{quantity}</span>
+                <button
+                  type="button"
+                  onClick={() => onAddToCart(product)}
+                  className="h-9 w-9 rounded-full border border-slate-300 text-lg text-slate-700 hover:bg-slate-100"
+                  aria-label={`Add another ${product.name}`}
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <aside className="rounded-[1.5rem] border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900">Order summary</h2>
+
+          <div className="mt-5 space-y-3 text-sm text-slate-600">
+            <div className="flex items-center justify-between">
+              <span>Subtotal</span>
+              <span>{formatCurrency.format(subtotal)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Shipping</span>
+              <span>{subtotal >= 75 ? 'Free' : formatCurrency.format(12)}</span>
+            </div>
+          </div>
+
+          <div className="mt-5 flex items-center justify-between border-t border-slate-200 pt-4 text-base font-bold text-slate-900">
+            <span>Total</span>
+            <span>
+              {formatCurrency.format(subtotal >= 75 ? subtotal : subtotal + 12)}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-700"
+          >
+            Checkout
+          </button>
+        </aside>
+      </div>
+    </section>
   )
 }
 
